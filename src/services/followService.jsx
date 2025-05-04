@@ -1,6 +1,7 @@
-// src/services/followService.js
+// src/services/followService.jsx
 import { supabase } from '../lib/supabase';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import notificationService from './notificationService';
 
 // Create a context for follow state
 const FollowContext = createContext(null);
@@ -11,63 +12,115 @@ const followCache = new Map();
 let followSubscription = null;
 
 /**
+ * Debug logging for follow service
+ */
+const debug = (message, data) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.debug(`[FollowService] ${message}`, data || '');
+  }
+};
+
+/**
+ * Centralized helper to update follow cache and notify components
+ */
+const updateFollowCache = (followerId, followingId, isFollowing) => {
+  debug(`Updating follow cache: ${followerId} -> ${followingId} (${isFollowing ? 'follow' : 'unfollow'})`);
+  
+  if (!followCache.has(followerId)) {
+    followCache.set(followerId, new Set());
+  }
+  
+  const userFollowing = followCache.get(followerId);
+  
+  if (isFollowing) {
+    userFollowing.add(followingId);
+  } else {
+    userFollowing.delete(followingId);
+  }
+  
+  // Notify all components using the hook
+  const event = new CustomEvent('follow-update', { 
+    detail: { followerId, followingId, isFollowing }
+  });
+  document.dispatchEvent(event);
+};
+
+/**
  * FollowProvider component to wrap your app
  * This provides follow state to all components
  */
 export function FollowProvider({ children }) {
   const [initialized, setInitialized] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUsername, setCurrentUsername] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Force a refresh of follow state
+  const refreshFollowState = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
 
   // Initialize follow service when user ID changes
   useEffect(() => {
+    let isMounted = true;
+    
     const initializeFollowSystem = async (userId) => {
       if (!userId) return;
+      debug(`Initializing follow system for user ${userId}`);
 
       // Clear existing subscription
       if (followSubscription) {
         supabase.removeChannel(followSubscription);
       }
 
-      // Initialize cache for this user
+      // Always refresh cache on initialization
       if (!followCache.has(userId)) {
         followCache.set(userId, new Set());
+      }
+      
+      // Fetch current username
+      const { data: userData } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', userId)
+        .single();
         
-        // Fetch and cache current follow relationships
-        try {
-          const { data } = await supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', userId);
-            
-          if (data && data.length > 0) {
-            const userFollowing = followCache.get(userId) || new Set();
-            data.forEach(item => userFollowing.add(item.following_id));
-            followCache.set(userId, userFollowing);
-          }
-        } catch (error) {
-          console.error('Error fetching follow data:', error);
+      if (userData?.username) {
+        setCurrentUsername(userData.username);
+      }
+      
+      // Fetch and cache current follow relationships
+      try {
+        const { data, error } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', userId);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          debug(`Found ${data.length} following relationships`);
+          const userFollowing = followCache.get(userId);
+          data.forEach(item => userFollowing.add(item.following_id));
+        } else {
+          debug('No following relationships found');
         }
+      } catch (error) {
+        console.error('Error fetching follow data:', error);
       }
 
       // Set up real-time subscription
       followSubscription = supabase
-        .channel('follow_changes')
+        .channel('follow-changes')
         .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
           table: 'follows',
           filter: `follower_id=eq.${userId}`
         }, (payload) => {
+          debug('Real-time: New follow detected', payload);
           const followingId = payload.new.following_id;
-          // Add to cache
-          const userFollowing = followCache.get(userId) || new Set();
-          userFollowing.add(followingId);
-          followCache.set(userId, userFollowing);
-          
-          // Force update in components
-          document.dispatchEvent(new CustomEvent('follow-update', { 
-            detail: { followerId: userId, followingId, isFollowing: true }
-          }));
+          updateFollowCache(userId, followingId, true);
         })
         .on('postgres_changes', {
           event: 'DELETE',
@@ -75,32 +128,36 @@ export function FollowProvider({ children }) {
           table: 'follows',
           filter: `follower_id=eq.${userId}`
         }, (payload) => {
+          debug('Real-time: Unfollow detected', payload);
           const followingId = payload.old.following_id;
-          // Remove from cache
-          const userFollowing = followCache.get(userId);
-          if (userFollowing) {
-            userFollowing.delete(followingId);
-          }
-          
-          // Force update in components
-          document.dispatchEvent(new CustomEvent('follow-update', { 
-            detail: { followerId: userId, followingId, isFollowing: false }
-          }));
+          updateFollowCache(userId, followingId, false);
         })
-        .subscribe();
+        .subscribe(status => {
+          debug(`Subscription status: ${status}`);
+          if (status === 'SUBSCRIBED' && isMounted) {
+            setInitialized(true);
+          }
+        });
 
-      setInitialized(true);
+      if (isMounted) setInitialized(true);
     };
 
     // Get current user from auth if available
     const getAuthUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      const userId = data?.session?.user?.id;
-      if (userId) {
-        setCurrentUserId(userId);
-        initializeFollowSystem(userId);
-      } else {
-        setInitialized(true); // Still mark as initialized even if no user
+      try {
+        const { data } = await supabase.auth.getSession();
+        const userId = data?.session?.user?.id;
+        if (userId) {
+          debug(`Current user: ${userId}`);
+          setCurrentUserId(userId);
+          initializeFollowSystem(userId);
+        } else {
+          debug('No authenticated user found');
+          setInitialized(true); // Still mark as initialized even if no user
+        }
+      } catch (error) {
+        console.error('Error getting auth session:', error);
+        setInitialized(true);
       }
     };
 
@@ -108,11 +165,12 @@ export function FollowProvider({ children }) {
 
     // Cleanup function
     return () => {
+      isMounted = false;
       if (followSubscription) {
         supabase.removeChannel(followSubscription);
       }
     };
-  }, []);
+  }, [refreshTrigger]);
 
   /**
    * Check if a user is following another user
@@ -120,27 +178,38 @@ export function FollowProvider({ children }) {
   const isFollowing = useCallback(async (followerId, followingId) => {
     if (!followerId || !followingId) return false;
     
+    debug(`Checking if ${followerId} is following ${followingId}`);
+    
     // Check cache first
     if (followCache.has(followerId)) {
-      return followCache.get(followerId).has(followingId);
+      const following = followCache.get(followerId).has(followingId);
+      debug(`Cache result: ${following}`);
+      return following;
     }
     
-    // If not in cache, query the database
+    // If not in cache, check database
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('follows')
         .select('id')
         .eq('follower_id', followerId)
         .eq('following_id', followingId)
-        .single();
+        .maybeSingle();
         
-      // Add to cache  
-      const userFollowing = followCache.get(followerId) || new Set();
+      if (error) throw error;
+      
+      // Initialize cache if needed
+      if (!followCache.has(followerId)) {
+        followCache.set(followerId, new Set());
+      }
+      
+      // Update cache with result
+      const userFollowing = followCache.get(followerId);
       if (data) {
         userFollowing.add(followingId);
       }
-      followCache.set(followerId, userFollowing);
       
+      debug(`Database result: ${!!data}`);
       return !!data;
     } catch (error) {
       console.error('Error checking follow status:', error);
@@ -149,87 +218,81 @@ export function FollowProvider({ children }) {
   }, []);
 
   /**
-   * Follow a user
+   * Follow a user with notification
    */
   const followUser = useCallback(async (followingId) => {
-    if (!currentUserId || !followingId || currentUserId === followingId) return false;
+    if (!currentUserId || !followingId || currentUserId === followingId) {
+      debug(`Cannot follow: Invalid IDs (${currentUserId}, ${followingId})`);
+      return { success: false, error: new Error('Invalid user IDs') };
+    }
+    
+    debug(`Following user: ${followingId}`);
     
     try {
       // Optimistic update
-      const userFollowing = followCache.get(currentUserId) || new Set();
-      userFollowing.add(followingId);
-      followCache.set(currentUserId, userFollowing);
-      
-      // Notify components
-      document.dispatchEvent(new CustomEvent('follow-update', { 
-        detail: { followerId: currentUserId, followingId, isFollowing: true }
-      }));
+      updateFollowCache(currentUserId, followingId, true);
       
       // Update database
-      await supabase
+      const { error } = await supabase
         .from('follows')
         .insert({
           follower_id: currentUserId,
           following_id: followingId,
           created_at: new Date().toISOString()
         });
-        
-      return true;
-    } catch (error) {
-      // Revert optimistic update on error
-      const userFollowing = followCache.get(currentUserId);
-      if (userFollowing) {
-        userFollowing.delete(followingId);
+      
+      if (error) {
+        // Revert optimistic update
+        updateFollowCache(currentUserId, followingId, false);
+        throw error;
       }
       
-      // Notify components of reversion
-      document.dispatchEvent(new CustomEvent('follow-update', { 
-        detail: { followerId: currentUserId, followingId, isFollowing: false }
-      }));
+      // Create notification (as a fallback if trigger fails)
+      await notificationService.createFollowNotification(
+        followingId,
+        currentUserId,
+        currentUsername || 'User'
+      );
       
+      return { success: true };
+    } catch (error) {
       console.error('Error following user:', error);
-      return false;
+      return { success: false, error };
     }
-  }, [currentUserId]);
+  }, [currentUserId, currentUsername]);
 
   /**
    * Unfollow a user
    */
   const unfollowUser = useCallback(async (followingId) => {
-    if (!currentUserId || !followingId) return false;
+    if (!currentUserId || !followingId) {
+      debug(`Cannot unfollow: Invalid IDs (${currentUserId}, ${followingId})`);
+      return { success: false, error: new Error('Invalid user IDs') };
+    }
+    
+    debug(`Unfollowing user: ${followingId}`);
     
     try {
       // Optimistic update
-      const userFollowing = followCache.get(currentUserId);
-      if (userFollowing) {
-        userFollowing.delete(followingId);
-      }
-      
-      // Notify components
-      document.dispatchEvent(new CustomEvent('follow-update', { 
-        detail: { followerId: currentUserId, followingId, isFollowing: false }
-      }));
+      updateFollowCache(currentUserId, followingId, false);
       
       // Update database
-      await supabase
+      const { error } = await supabase
         .from('follows')
         .delete()
         .eq('follower_id', currentUserId)
         .eq('following_id', followingId);
-        
-      return true;
+      
+      if (error) {
+        // Revert optimistic update
+        updateFollowCache(currentUserId, followingId, true);
+        throw error;
+      }
+      
+      return { success: true };
     } catch (error) {
-      // Revert optimistic update on error
-      const userFollowing = followCache.get(currentUserId) || new Set();
-      userFollowing.add(followingId);
-      
-      // Notify components of reversion
-      document.dispatchEvent(new CustomEvent('follow-update', { 
-        detail: { followerId: currentUserId, followingId, isFollowing: true }
-      }));
-      
       console.error('Error unfollowing user:', error);
-      return false;
+      return { success: false, error };
     }
   }, [currentUserId]);
 
@@ -237,16 +300,15 @@ export function FollowProvider({ children }) {
    * Toggle follow state
    */
   const toggleFollow = useCallback(async (followingId) => {
-    if (!currentUserId || !followingId) return;
+    debug(`Toggling follow: ${followingId}`);
+    const following = await isFollowing(currentUserId, followingId);
     
-    const isCurrentlyFollowing = await isFollowing(currentUserId, followingId);
-    
-    if (isCurrentlyFollowing) {
+    if (following) {
       return unfollowUser(followingId);
     } else {
       return followUser(followingId);
     }
-  }, [currentUserId, isFollowing, followUser, unfollowUser]);
+  }, [currentUserId, isFollowing, unfollowUser, followUser]);
 
   // Create context value
   const contextValue = {
@@ -255,7 +317,9 @@ export function FollowProvider({ children }) {
     unfollowUser,
     toggleFollow,
     initialized,
-    currentUserId
+    currentUserId,
+    currentUsername,
+    refreshFollowState
   };
 
   return (
@@ -265,7 +329,9 @@ export function FollowProvider({ children }) {
   );
 }
 
-// Custom hook to use follow functionality
+/**
+ * Custom hook to use follow functionality
+ */
 export function useFollow() {
   const context = useContext(FollowContext);
   if (!context) {
@@ -274,9 +340,11 @@ export function useFollow() {
   return context;
 }
 
-// Hook to check if current user is following a specific user
+/**
+ * Hook to check if current user is following a specific user
+ */
 export function useFollowStatus(userId) {
-  const { isFollowing, currentUserId } = useFollow();
+  const { isFollowing, currentUserId, followUser, unfollowUser, currentUsername } = useFollow();
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -285,14 +353,23 @@ export function useFollowStatus(userId) {
     
     const checkFollowStatus = async () => {
       if (!currentUserId || !userId) {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
         return;
       }
       
-      const status = await isFollowing(currentUserId, userId);
-      if (isMounted) {
-        setFollowing(status);
-        setLoading(false);
+      try {
+        const status = await isFollowing(currentUserId, userId);
+        if (isMounted) {
+          setFollowing(status);
+        }
+      } catch (error) {
+        console.error('Error checking follow status:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
@@ -314,150 +391,124 @@ export function useFollowStatus(userId) {
     };
   }, [currentUserId, userId, isFollowing]);
 
-  return { following, loading };
+  // Handle follow action
+  const handleFollow = async () => {
+    if (following) {
+      const result = await unfollowUser(userId);
+      if (result.success) {
+        setFollowing(false);
+      }
+      return result;
+    } else {
+      const result = await followUser(userId);
+      if (result.success) {
+        setFollowing(true);
+        
+        // Explicitly create a follow notification
+        notificationService.createFollowNotification(
+          userId,
+          currentUserId,
+          currentUsername || 'User'
+        );
+      }
+      return result;
+    }
+  };
+
+  // Return follow status and direct actions for this specific user
+  return { 
+    following, 
+    loading,
+    toggleFollow: handleFollow 
+  };
 }
 
-// Also export a version of the old followService API for backwards compatibility
-const followService = {
-  initializeFollowSystem: async function(userId) {
-    // This is a no-op now as initialization happens in the provider
-    console.warn('initializeFollowSystem is deprecated. Use <FollowProvider> instead.');
-    return true;
-  },
-  
-  refreshFollowCache: async function(userId) {
-    console.warn('refreshFollowCache is deprecated. Follow state is managed automatically.');
-    // Just return the cached data or fetch it
-    if (!userId) return [];
-    
-    if (followCache.has(userId)) {
-      return Array.from(followCache.get(userId));
-    }
-    
+// Legacy API for backward compatibility
+export default {
+  isFollowing: async (followerId, followingId) => {
     try {
+      if (!followerId || !followingId) return false;
+      
+      // Check cache first
+      if (followCache.has(followerId)) {
+        return followCache.get(followerId).has(followingId);
+      }
+      
+      // Otherwise check database
       const { data } = await supabase
         .from('follows')
-        .select('following_id')
-        .eq('follower_id', userId);
-        
-      const followingIds = data?.map(f => f.following_id) || [];
-      followCache.set(userId, new Set(followingIds));
-      return followingIds;
+        .select('id')
+        .eq('follower_id', followerId)
+        .eq('following_id', followingId)
+        .maybeSingle();
+      
+      return !!data;
     } catch (error) {
-      console.error('Error fetching follows:', error);
-      return [];
+      console.error('Error checking follow status:', error);
+      return false;
     }
   },
-  
-  isFollowing: async function(followerId, followingId) {
-    if (!followerId || !followingId) return false;
-    
-    // Reuse the implementation from the hook
-    return await isFollowing(followerId, followingId);
-  },
-  
-  followUser: async function(followerId, followingId) {
-    console.warn('followService.followUser is deprecated. Use useFollow().followUser instead.');
-    if (!followerId || !followingId) return false;
-    
+  followUser: async (followerId, followingId) => {
     try {
-      // Add to cache
-      const userFollowing = followCache.get(followerId) || new Set();
-      userFollowing.add(followingId);
-      followCache.set(followerId, userFollowing);
+      if (followerId === followingId) return false;
       
-      // Update DB
-      await supabase
-        .from('follows')
-        .insert({
-          follower_id: followerId,
-          following_id: followingId,
-          created_at: new Date().toISOString()
-        });
+      // Update cache
+      if (!followCache.has(followerId)) {
+        followCache.set(followerId, new Set());
+      }
+      followCache.get(followerId).add(followingId);
       
-      // Trigger event
-      document.dispatchEvent(new CustomEvent('follow-update', { 
-        detail: { followerId, followingId, isFollowing: true }
-      }));
+      // Update database
+      await supabase.from('follows').insert({
+        follower_id: followerId,
+        following_id: followingId,
+        created_at: new Date().toISOString()
+      });
+      
+      // Get username for notification
+      const { data: userData } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', followerId)
+        .single();
+        
+      // Create notification
+      await notificationService.createFollowNotification(
+        followingId,
+        followerId,
+        userData?.username || 'User'
+      );
       
       return true;
     } catch (error) {
       console.error('Error following user:', error);
+      // Revert cache on error
+      if (followCache.has(followerId)) {
+        followCache.get(followerId).delete(followingId);
+      }
       return false;
     }
   },
-  
-  unfollowUser: async function(followerId, followingId) {
-    console.warn('followService.unfollowUser is deprecated. Use useFollow().unfollowUser instead.');
-    if (!followerId || !followingId) return false;
-    
+  unfollowUser: async (followerId, followingId) => {
     try {
-      // Remove from cache
-      const userFollowing = followCache.get(followerId);
-      if (userFollowing) {
-        userFollowing.delete(followingId);
+      // Update cache
+      if (followCache.has(followerId)) {
+        followCache.get(followerId).delete(followingId);
       }
       
-      // Update DB
-      await supabase
-        .from('follows')
-        .delete()
+      // Update database
+      await supabase.from('follows').delete()
         .eq('follower_id', followerId)
         .eq('following_id', followingId);
-      
-      // Trigger event
-      document.dispatchEvent(new CustomEvent('follow-update', { 
-        detail: { followerId, followingId, isFollowing: false }
-      }));
       
       return true;
     } catch (error) {
       console.error('Error unfollowing user:', error);
-      return false;
-    }
-  },
-  
-  toggleFollow: async function(followerId, followingId) {
-    console.warn('followService.toggleFollow is deprecated. Use useFollow().toggleFollow instead.');
-    if (!followerId || !followingId) return false;
-    
-    const isCurrentlyFollowing = await this.isFollowing(followerId, followingId);
-    
-    if (isCurrentlyFollowing) {
-      return this.unfollowUser(followerId, followingId);
-    } else {
-      return this.followUser(followerId, followingId);
-    }
-  },
-  
-  subscribeToFollowStatus: function(targetUserId, callback) {
-    console.warn('subscribeToFollowStatus is deprecated. Use useFollowStatus() hook instead.');
-    if (!targetUserId || typeof callback !== 'function') {
-      return () => {};
-    }
-    
-    const handleFollowUpdate = (event) => {
-      const { followingId, isFollowing } = event.detail;
-      if (followingId === targetUserId) {
-        callback(followerId, isFollowing);
+      // Revert cache on error
+      if (followCache.has(followerId)) {
+        followCache.get(followerId).add(followingId);
       }
-    };
-    
-    document.addEventListener('follow-update', handleFollowUpdate);
-    
-    return () => {
-      document.removeEventListener('follow-update', handleFollowUpdate);
-    };
-  },
-  
-  cleanup: function() {
-    console.warn('followService.cleanup is deprecated. Cleanup is managed automatically.');
-    if (followSubscription) {
-      supabase.removeChannel(followSubscription);
-      followSubscription = null;
+      return false;
     }
   }
 };
-
-// Export default for backwards compatibility
-export default followService;
