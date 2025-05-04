@@ -1,0 +1,404 @@
+/* src/styles/animations.css */
+/* 
+ * Premium Animations Library for UniShare
+ * Inspired by high-end design systems from Somewhere Good, Glass, Polywork, Nike and Apple
+ */
+
+/* Fade In animation */
+@keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+  
+  /* Fade in up animation */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+  }
+  
+  /* Fade in down animation */
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .fade-in-down {
+    animation: fadeInDown 0.6s ease-out forwards;
+  }
+  
+  /* Fade in left animation */
+  @keyframes fadeInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  .fade-in-left {
+    animation: fadeInLeft 0.6s ease-out forwards;
+  }
+  
+  /* Fade in right animation */
+  @keyframes fadeInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  .fade-in-right {
+    animation: fadeInRight 0.6s ease-out forwards;
+  }
+  
+  /* Scale In animation */
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  .scale-in {
+    animation: scaleIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  /* Scale In Out (pulsing) animation */
+  @keyframes scaleInOut {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  .scale-in-out {
+    animation: scaleInOut 2s ease-in-out infinite;
+  }
+  
+  /* Glow Pulse animation */
+  @keyframes glowPulse {
+    0% {
+      box-shadow: 0 0 0px rgba(34, 211, 238, 0);
+    }
+    50% {
+      box-shadow: 0 0 15px rgba(34, 211, 238, 0.6);
+    }
+    100% {
+      box-shadow: 0 0 0px rgba(34, 211, 238, 0);
+    }
+  }
+  
+  .glow-pulse {
+    animation: glowPulse 2s ease-in-out infinite;
+  }
+  
+  /* Gradient Shift animation */
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  
+  .gradient-shift {
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+  }
+  
+  /* Float animation */
+  @keyframes float {
+    0% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+    100% {
+      transform: translateY(0px);
+    }
+  }
+  
+  .float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  /* Spinner animation */
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .spin {
+    animation: spin 1.5s linear infinite;
+  }
+  
+  /* Shimmer animation for loading states */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+  
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.03)
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  
+  /* Slide In animation for modals and drawers */
+  @keyframes slideInUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  
+  .slide-in-up {
+    animation: slideInUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  /* Blur In animation */
+  @keyframes blurIn {
+    from {
+      opacity: 0;
+      filter: blur(20px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+  
+  .blur-in {
+    animation: blurIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  /* Glass reveal animation */
+  @keyframes glassReveal {
+    0% {
+      opacity: 0;
+      backdrop-filter: blur(0);
+      background-color: rgba(255, 255, 255, 0);
+    }
+    100% {
+      opacity: 1;
+      backdrop-filter: blur(10px);
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+  
+  .glass-reveal {
+    animation: glassReveal 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  /* Border glow animation */
+  @keyframes borderGlow {
+    0% {
+      border-color: rgba(34, 211, 238, 0.3);
+      box-shadow: 0 0 0px rgba(34, 211, 238, 0);
+    }
+    50% {
+      border-color: rgba(34, 211, 238, 0.8);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+    }
+    100% {
+      border-color: rgba(34, 211, 238, 0.3);
+      box-shadow: 0 0 0px rgba(34, 211, 238, 0);
+    }
+  }
+  
+  .border-glow {
+    animation: borderGlow 2s ease-in-out infinite;
+  }
+  
+  /* Text fade animation for placeholders */
+  @keyframes textFade {
+    0%, 100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  
+  .text-fade {
+    animation: textFade 2s ease-in-out infinite;
+  }
+  
+  /* Staggered children animations */
+  .stagger-children > * {
+    opacity: 0;
+  }
+  
+  .stagger-children > *:nth-child(1) { animation: fadeInUp 0.5s 0.1s forwards; }
+  .stagger-children > *:nth-child(2) { animation: fadeInUp 0.5s 0.2s forwards; }
+  .stagger-children > *:nth-child(3) { animation: fadeInUp 0.5s 0.3s forwards; }
+  .stagger-children > *:nth-child(4) { animation: fadeInUp 0.5s 0.4s forwards; }
+  .stagger-children > *:nth-child(5) { animation: fadeInUp 0.5s 0.5s forwards; }
+  .stagger-children > *:nth-child(6) { animation: fadeInUp 0.5s 0.6s forwards; }
+  .stagger-children > *:nth-child(7) { animation: fadeInUp 0.5s 0.7s forwards; }
+  .stagger-children > *:nth-child(8) { animation: fadeInUp 0.5s 0.8s forwards; }
+  .stagger-children > *:nth-child(9) { animation: fadeInUp 0.5s 0.9s forwards; }
+  .stagger-children > *:nth-child(10) { animation: fadeInUp 0.5s 1.0s forwards; }
+  
+  /* Animation delays */
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-400 { animation-delay: 0.4s; }
+  .delay-500 { animation-delay: 0.5s; }
+  .delay-600 { animation-delay: 0.6s; }
+  .delay-700 { animation-delay: 0.7s; }
+  .delay-800 { animation-delay: 0.8s; }
+  .delay-900 { animation-delay: 0.9s; }
+  .delay-1000 { animation-delay: 1s; }
+  
+  /* Animation durations */
+  .duration-300 { animation-duration: 0.3s; }
+  .duration-500 { animation-duration: 0.5s; }
+  .duration-700 { animation-duration: 0.7s; }
+  .duration-1000 { animation-duration: 1s; }
+  .duration-1500 { animation-duration: 1.5s; }
+  .duration-2000 { animation-duration: 2s; }
+  .duration-3000 { animation-duration: 3s; }
+  
+  /* Custom animation for grid items - useful for photo galleries */
+  @keyframes cardEntrance {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+      filter: blur(5px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+    }
+  }
+  
+  .card-entrance {
+    animation: cardEntrance 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  /* Card rotation animation for hover effects */
+  @keyframes cardRotate {
+    0% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(1deg);
+    }
+    75% {
+      transform: rotate(-1deg);
+    }
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+  
+  .card-rotate:hover {
+    animation: cardRotate 0.8s ease-in-out;
+  }
+  
+  /* Premium button hover effect */
+  .btn-premium {
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-premium::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0.2),
+      rgba(255, 255, 255, 0)
+    );
+    z-index: -1;
+    transition: all 0.6s ease;
+  }
+  
+  .btn-premium:hover::before {
+    left: 100%;
+  }
+  
+  /* Glass card effects */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  .glass-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  }
