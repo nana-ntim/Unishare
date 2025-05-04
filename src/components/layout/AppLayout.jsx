@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PropTypes from 'prop-types';
 import Avatar from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
+import NotificationIndicator from '../ui/NotificationIndicator';
 
 /**
  * AppLayout Component - Unified layout with sidebar and responsive design

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
+import { useFollow, useFollowStatus } from '../services/followService';
 import { supabase } from '../lib/supabase';
 import AppLayout from '../components/layout/AppLayout';
 import PostCard from '../components/ui/PostCard';
@@ -12,11 +13,7 @@ import Avatar from '../components/ui/Avatar';
 /**
  * ProfilePage Component
  * 
- * Clean, streamlined profile page with:
- * - User details and bio
- * - Posts display
- * - Follow functionality
- * - Responsive layout
+ * Displays user profile with posts and follow functionality
  */
 const ProfilePage = () => {
   // Get route parameters and auth context
@@ -24,20 +21,27 @@ const ProfilePage = () => {
   const { user, profile: currentUserProfile } = useAuth();
   const navigate = useNavigate();
   
-  // State
+  // FollowService hooks
+  const { initialized: followInitialized } = useFollow();
+  
+  // Local state
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(null); // 'followers' or 'following'
   const [modalUsers, setModalUsers] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [followActionLoading, setFollowActionLoading] = useState(false);
   
   // Determine if viewing own profile
-  const isOwnProfile = username ? currentUserProfile?.username === username : true;
+  const isOwnProfile = username 
+    ? currentUserProfile?.username === username 
+    : true;
+  
+  // Use the follow status hook when viewing another user's profile
+  const followStatus = useFollowStatus(profile?.id);
   
   // Load profile data
   useEffect(() => {
@@ -47,26 +51,37 @@ const ProfilePage = () => {
         
         // If no username provided or it's the current user, use the current user's profile
         if (isOwnProfile && currentUserProfile) {
+          console.log('Using current user profile:', currentUserProfile);
           setProfile(currentUserProfile);
           
           // Get followers count
-          const { count: followersCount } = await supabase
+          const { count: followersCount, error: followersError } = await supabase
             .from('follows')
             .select('follower_id', { count: 'exact' })
             .eq('following_id', currentUserProfile.id);
           
-          setFollowersCount(followersCount || 0);
+          if (followersError) {
+            console.error('Error fetching followers count:', followersError);
+          } else {
+            setFollowersCount(followersCount || 0);
+          }
           
           // Get following count
-          const { count: followingCount } = await supabase
+          const { count: followingCount, error: followingError } = await supabase
             .from('follows')
             .select('following_id', { count: 'exact' })
             .eq('follower_id', currentUserProfile.id);
           
-          setFollowingCount(followingCount || 0);
+          if (followingError) {
+            console.error('Error fetching following count:', followingError);
+          } else {
+            setFollowingCount(followingCount || 0);
+          }
         } 
         // Otherwise fetch the requested user's profile
         else if (username) {
+          console.log('Fetching profile for username:', username);
+          
           // Get user profile by username
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
@@ -83,31 +98,27 @@ const ProfilePage = () => {
           setProfile(profileData);
           
           // Get followers count
-          const { count: followersCount } = await supabase
+          const { count: followersCount, error: followersError } = await supabase
             .from('follows')
             .select('follower_id', { count: 'exact' })
             .eq('following_id', profileData.id);
           
-          setFollowersCount(followersCount || 0);
+          if (followersError) {
+            console.error('Error fetching followers count:', followersError);
+          } else {
+            setFollowersCount(followersCount || 0);
+          }
           
           // Get following count
-          const { count: followingCount } = await supabase
+          const { count: followingCount, error: followingError } = await supabase
             .from('follows')
             .select('following_id', { count: 'exact' })
             .eq('follower_id', profileData.id);
           
-          setFollowingCount(followingCount || 0);
-          
-          // Check if current user is following this profile
-          if (user) {
-            const { data: followData } = await supabase
-              .from('follows')
-              .select('id')
-              .eq('follower_id', user.id)
-              .eq('following_id', profileData.id)
-              .single();
-              
-            setIsFollowing(!!followData);
+          if (followingError) {
+            console.error('Error fetching following count:', followingError);
+          } else {
+            setFollowingCount(followingCount || 0);
           }
         }
       } catch (error) {
@@ -117,10 +128,10 @@ const ProfilePage = () => {
       }
     };
     
-    if (user) {
+    if (user && followInitialized) {
       fetchProfile();
     }
-  }, [user, username, navigate, isOwnProfile, currentUserProfile]);
+  }, [user, username, navigate, isOwnProfile, currentUserProfile, followInitialized]);
   
   // Load posts for the profile
   useEffect(() => {
@@ -128,13 +139,17 @@ const ProfilePage = () => {
       if (!profile?.id) return;
       
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('post_details')
           .select('*')
           .eq('user_id', profile.id)
           .order('created_at', { ascending: false });
         
-        setPosts(data || []);
+        if (error) {
+          console.error('Error fetching posts:', error);
+        } else {
+          setPosts(data || []);
+        }
       } catch (error) {
         console.error('Error fetching posts:', error);
       }
@@ -152,7 +167,7 @@ const ProfilePage = () => {
       
       if (type === 'followers') {
         // Get followers
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('follows')
           .select(`
             follower:profiles!follows_follower_id_fkey (
@@ -165,6 +180,10 @@ const ProfilePage = () => {
           .eq('following_id', profile.id)
           .order('created_at', { ascending: false });
         
+        if (error) {
+          throw error;
+        }
+        
         // Format follower data
         const formattedUsers = (data || []).map(item => ({
           ...item.follower
@@ -173,7 +192,7 @@ const ProfilePage = () => {
         setModalUsers(formattedUsers);
       } else {
         // Get following
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('follows')
           .select(`
             following:profiles!follows_following_id_fkey (
@@ -185,6 +204,10 @@ const ProfilePage = () => {
           `)
           .eq('follower_id', profile.id)
           .order('created_at', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
         
         // Format following data
         const formattedUsers = (data || []).map(item => ({
@@ -209,39 +232,26 @@ const ProfilePage = () => {
     }
   }, [followersCount, followingCount, loadUsers]);
   
-  // Handle profile follow toggle
-  const handleFollowToggle = useCallback(async () => {
-    if (!profile?.id || followLoading) return;
+  // Handle follow toggle action
+  const handleFollowToggle = async () => {
+    if (!profile?.id || followActionLoading) return;
     
-    setFollowLoading(true);
     try {
-      if (isFollowing) {
-        // Unfollow
-        await supabase
-          .from('follows')
-          .delete()
-          .eq('follower_id', user.id)
-          .eq('following_id', profile.id);
-      } else {
-        // Follow
-        await supabase
-          .from('follows')
-          .insert({
-            follower_id: user.id,
-            following_id: profile.id,
-            created_at: new Date().toISOString()
-          });
-      }
+      setFollowActionLoading(true);
       
-      // Update UI state
-      setIsFollowing(!isFollowing);
-      setFollowersCount(prev => isFollowing ? prev - 1 : prev + 1);
+      // Execute follow action using hook
+      const { success } = await followStatus.toggleFollow();
+      
+      if (success) {
+        // Update followers count
+        setFollowersCount(prev => followStatus.following ? prev - 1 : prev + 1);
+      }
     } catch (error) {
-      console.error('Error toggling follow:', error);
+      console.error('Follow action error:', error);
     } finally {
-      setFollowLoading(false);
+      setFollowActionLoading(false);
     }
-  }, [profile?.id, followLoading, isFollowing, user?.id]);
+  };
   
   // Format posts for display
   const formattedPosts = posts.map(post => ({
@@ -304,42 +314,58 @@ const ProfilePage = () => {
               </div>
             ) : (
               <div>
-                {modalUsers.map(user => (
-                  <div 
-                    key={user.id} 
-                    className="p-4 flex items-center hover:bg-white/5 transition-colors"
-                  >
+                {modalUsers.map(user => {
+                  // Use a separate state tracker for each modal user
+                  const [followLoading, setFollowLoading] = useState(false);
+                  const modalUserFollowStatus = useFollowStatus(user.id);
+                  
+                  return (
                     <div 
-                      className="cursor-pointer"
-                      onClick={() => {
-                        navigate(`/profile/${user.username}`);
-                        setModalOpen(null);
-                      }}
+                      key={user.id} 
+                      className="p-4 flex items-center hover:bg-white/5 transition-colors"
                     >
-                      <Avatar
-                        src={user.avatar_url}
-                        name={user.full_name || user.username}
-                        size="md"
-                      />
+                      <div 
+                        className="cursor-pointer"
+                        onClick={() => {
+                          navigate(`/profile/${user.username}`);
+                          setModalOpen(null);
+                        }}
+                      >
+                        <Avatar
+                          src={user.avatar_url}
+                          name={user.full_name || user.username}
+                          size="md"
+                        />
+                      </div>
+                      <div 
+                        className="ml-3 flex-1 min-w-0 cursor-pointer"
+                        onClick={() => {
+                          navigate(`/profile/${user.username}`);
+                          setModalOpen(null);
+                        }}
+                      >
+                        <p className="font-semibold text-white truncate">{user.full_name || user.username}</p>
+                        <p className="text-white/60 text-sm truncate">@{user.username}</p>
+                      </div>
+                      {!isOwnProfile && user.id !== currentUserProfile?.id && (
+                        <Button 
+                          variant={modalUserFollowStatus.following ? "secondary" : "primary"}
+                          size="small"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setFollowLoading(true);
+                            await modalUserFollowStatus.toggleFollow();
+                            setFollowLoading(false);
+                          }}
+                          disabled={followLoading || modalUserFollowStatus.loading}
+                        >
+                          {followLoading ? 'Loading...' : 
+                            modalUserFollowStatus.following ? 'Following' : 'Follow'}
+                        </Button>
+                      )}
                     </div>
-                    <div 
-                      className="ml-3 flex-1 min-w-0 cursor-pointer"
-                      onClick={() => {
-                        navigate(`/profile/${user.username}`);
-                        setModalOpen(null);
-                      }}
-                    >
-                      <p className="font-semibold text-white truncate">{user.full_name || user.username}</p>
-                      <p className="text-white/60 text-sm truncate">@{user.username}</p>
-                    </div>
-                    <Button 
-                      variant="primary"
-                      size="small"
-                    >
-                      Follow
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -413,11 +439,12 @@ const ProfilePage = () => {
                 </Button>
               ) : (
                 <Button
-                  variant={isFollowing ? "secondary" : "primary"}
+                  variant={followStatus.following ? "secondary" : "primary"}
                   onClick={handleFollowToggle}
-                  disabled={followLoading}
+                  disabled={followActionLoading || followStatus.loading}
                 >
-                  {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+                  {followActionLoading ? 'Loading...' : 
+                   followStatus.following ? 'Following' : 'Follow'}
                 </Button>
               )}
             </div>

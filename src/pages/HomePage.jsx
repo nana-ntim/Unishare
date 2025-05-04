@@ -8,14 +8,12 @@ import AppLayout from '../components/layout/AppLayout';
 import PostCard from '../components/ui/PostCard';
 import Button from '../components/ui/FormComponents';
 import Avatar from '../components/ui/Avatar';
+import UserFollowButton from '../components/ui/UserFollowButton';
 
 /**
  * HomePage Component
  * 
- * Unified, streamlined homepage with:
- * - Feed tabs (Following, Discover, University)
- * - Responsive layout with sidebar for large screens
- * - Suggested users and trending topics
+ * Main feed with tabs for different content streams
  */
 const HomePage = () => {
   const { user, profile } = useAuth();
@@ -66,6 +64,8 @@ const HomePage = () => {
         let query;
         
         if (activeTab === 'following') {
+          console.log('Loading following feed');
+          
           // Get posts from users that the current user follows
           const { data: followingData } = await supabase
             .from('follows')
@@ -92,6 +92,8 @@ const HomePage = () => {
             .order('created_at', { ascending: false })
             .limit(10);
         } else if (activeTab === 'university' && profile?.university) {
+          console.log('Loading university feed');
+          
           // Get posts from users at the same university
           query = supabase
             .from('post_details')
@@ -100,6 +102,8 @@ const HomePage = () => {
             .order('created_at', { ascending: false })
             .limit(10);
         } else {
+          console.log('Loading discover feed');
+          
           // Discover tab - get popular posts
           query = supabase
             .from('post_details')
@@ -108,8 +112,14 @@ const HomePage = () => {
             .limit(10);
         }
         
-        const { data: postsData } = await query;
-        setPosts(postsData || []);
+        const { data: postsData, error } = await query;
+        
+        if (error) {
+          console.error('Error fetching feed:', error);
+          setPosts([]);
+        } else {
+          setPosts(postsData || []);
+        }
       } catch (error) {
         console.error('Error fetching feed:', error);
         setPosts([]);
@@ -164,37 +174,11 @@ const HomePage = () => {
     fetchSidebar();
   }, [user]);
   
-  // Handle following a user
-  const handleFollowUser = useCallback(async (userId) => {
-    if (!user) return;
-    
-    try {
-      await supabase
-        .from('follows')
-        .insert({
-          follower_id: user.id,
-          following_id: userId,
-          created_at: new Date().toISOString()
-        });
-      
-      // Update UI optimistically by removing from suggestions
-      setSuggestedUsers(prev => 
-        prev.filter(u => u.id !== userId)
-      );
-    } catch (error) {
-      console.error('Error following user:', error);
-    }
-  }, [user]);
-  
-  // Handle selecting a hashtag
-  const handleTagSelect = useCallback((tagName) => {
-    navigate(`/explore?tag=${tagName}`);
-  }, [navigate]);
-  
-  // Format posts for PostCard component
+  // Format posts for display
   const formattedPosts = posts.map(post => ({
     id: post.id,
     author: {
+      id: post.user_id,
       name: post.full_name,
       username: post.username,
       avatar: post.avatar_url,
@@ -207,6 +191,14 @@ const HomePage = () => {
     timestamp: post.created_at,
     location: post.location
   }));
+  
+  // Refresh suggested users after follow action
+  const handleFollowStatusChange = useCallback((userId, isFollowing) => {
+    if (isFollowing) {
+      // Remove user from suggestions after following
+      setSuggestedUsers(prev => prev.filter(user => user.id !== userId));
+    }
+  }, []);
   
   // Empty feed component
   const EmptyFeed = () => (
@@ -389,13 +381,12 @@ const HomePage = () => {
                           </div>
                         </div>
                         
-                        <Button
+                        <UserFollowButton
+                          userId={user.id}
                           variant="primary"
                           size="small"
-                          onClick={() => handleFollowUser(user.id)}
-                        >
-                          Follow
-                        </Button>
+                          onFollowChange={(isFollowing) => handleFollowStatusChange(user.id, isFollowing)}
+                        />
                       </div>
                     ))}
                   </div>
@@ -423,7 +414,7 @@ const HomePage = () => {
                         key={tag.id}
                         variant="secondary"
                         size="small"
-                        onClick={() => handleTagSelect(tag.name)}
+                        onClick={() => navigate(`/explore?tag=${tag.name}`)}
                       >
                         #{tag.name}
                       </Button>
@@ -473,14 +464,13 @@ const HomePage = () => {
                   <p className="text-white/60 text-xs truncate w-full text-center mb-2">
                     @{user.username}
                   </p>
-                  <Button
+                  <UserFollowButton
+                    userId={user.id}
                     variant="primary"
                     size="small"
-                    onClick={() => handleFollowUser(user.id)}
-                    fullWidth
-                  >
-                    Follow
-                  </Button>
+                    onFollowChange={(isFollowing) => handleFollowStatusChange(user.id, isFollowing)}
+                    className="w-full"
+                  />
                 </div>
               ))}
             </div>

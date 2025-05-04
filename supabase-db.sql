@@ -570,3 +570,237 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER process_post_hashtags_trigger
   AFTER INSERT OR UPDATE OF caption ON posts
   FOR EACH ROW EXECUTE FUNCTION process_post_hashtags();
+
+-- Run this in your Supabase SQL Editor to create notification triggers
+
+-- First, check if notifications table exists and create it if not
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'notifications') THEN
+        -- Create notifications table
+        CREATE TABLE public.notifications (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+            actor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+            type VARCHAR(50) NOT NULL,
+            entity_type VARCHAR(50) NOT NULL,
+            entity_id UUID,
+            data JSONB DEFAULT '{}'::jsonb,
+            message TEXT,
+            read BOOLEAN DEFAULT false,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        -- Add RLS policies for notifications
+        ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+        
+        -- Create policy to allow users to read their own notifications
+        CREATE POLICY "Users can read their own notifications" 
+        ON public.notifications FOR SELECT 
+        USING (auth.uid() = user_id);
+        
+        -- Create policy to allow users to update their own notifications (for marking as read)
+        CREATE POLICY "Users can update their own notifications" 
+        ON public.notifications FOR UPDATE 
+        USING (auth.uid() = user_id);
+        
+        -- Create policy for service role to insert notifications
+        CREATE POLICY "Service role can insert notifications" 
+        ON public.notifications FOR INSERT 
+        WITH CHECK (true);
+    END IF;
+END
+$$;
+
+-- Create trigger for like notifications
+CREATE OR REPLACE FUNCTION create_like_notification()
+RETURNS TRIGGER AS $$
+DECLARE
+    post_owner_id UUID;
+    username_val TEXT;
+BEGIN
+    -- First find the owner of the post
+    SELECT user_id INTO post_owner_id
+    FROM posts
+    WHERE id = NEW.post_id;
+    
+    -- Skip if the post owner is liking their own post
+    IF post_owner_id = NEW.user_id THEN
+        RETURN NEW;
+    END IF;
+    
+    -- Get the username of the person who liked
+    SELECT username INTO username_val
+    FROM profiles
+    WHERE id = NEW.user_id;
+    
+    -- Create the notification
+    INSERT INTO notifications (
+        user_id,
+        actor_id,
+        type,
+        entity_type,
+        entity_id,
+        data,
+        read,
+        created_at
+    ) VALUES (
+        post_owner_id,
+        NEW.user_id,
+        'like',
+        'post',
+        NEW.post_id,
+        jsonb_build_object(
+            'username', username_val,
+            'post_id', NEW.post_id
+        ),
+        false,
+        NOW()
+    );
+    
+    RETURN NEW;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log error but don't block the like operation
+        RAISE NOTICE 'Error creating like notification: %', SQLERRM;
+        RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Drop the trigger if it exists already to avoid errors
+DROP TRIGGER IF EXISTS after_insert_like ON likes;
+
+-- Create the trigger
+CREATE TRIGGER after_insert_like
+AFTER INSERT ON likes
+FOR EACH ROW
+EXECUTE FUNCTION create_like_notification();
+
+-- Create trigger for comment notifications
+CREATE OR REPLACE FUNCTION create_comment_notification()
+RETURNS TRIGGER AS $$
+DECLARE
+    post_owner_id UUID;
+    username_val TEXT;
+BEGIN
+    -- First find the owner of the post
+    SELECT user_id INTO post_owner_id
+    FROM posts
+    WHERE id = NEW.post_id;
+    
+    -- Skip if the post owner is commenting on their own post
+    IF post_owner_id = NEW.user_id THEN
+        RETURN NEW;
+    END IF;
+    
+    -- Get the username of the commenter
+    SELECT username INTO username_val
+    FROM profiles
+    WHERE id = NEW.user_id;
+    
+    -- Create the notification
+    INSERT INTO notifications (
+        user_id,
+        actor_id,
+        type,
+        entity_type,
+        entity_id,
+        data,
+        read,
+        created_at
+    ) VALUES (
+        post_owner_id,
+        NEW.user_id,
+        'comment',
+        'post',
+        NEW.post_id,
+        jsonb_build_object(
+            'username', username_val,
+            'post_id', NEW.post_id,
+            'comment_id', NEW.id,
+            'content', substring(NEW.content from 1 for 100)
+        ),
+        false,
+        NOW()
+    );
+    
+    RETURN NEW;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log error but don't block the comment operation
+        RAISE NOTICE 'Error creating comment notification: %', SQLERRM;
+        RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Drop the trigger if it exists already to avoid errors
+DROP TRIGGER IF EXISTS after_insert_comment ON comments;
+
+-- Create the trigger
+CREATE TRIGGER after_insert_comment
+AFTER INSERT ON comments
+FOR EACH ROW
+EXECUTE FUNCTION create_comment_notification();
+
+-- Create trigger for follow notifications
+CREATE OR REPLACE FUNCTION create_follow_notification()
+RETURNS TRIGGER AS $$
+DECLARE
+    username_val TEXT;
+BEGIN
+    -- Skip if someone is following themselves (shouldn't happen but just in case)
+    IF NEW.follower_id = NEW.following_id THEN
+        RETURN NEW;
+    END IF;
+    
+    -- Get the username of the follower
+    SELECT username INTO username_val
+    FROM profiles
+    WHERE id = NEW.follower_id;
+    
+    -- Create the notification
+    INSERT INTO notifications (
+        user_id,
+        actor_id,
+        type,
+        entity_type,
+        entity_id,
+        data,
+        read,
+        created_at
+    ) VALUES (
+        NEW.following_id,
+        NEW.follower_id,
+        'follow',
+        'profile',
+        NEW.following_id,
+        jsonb_build_object(
+            'username', username_val
+        ),
+        false,
+        NOW()
+    );
+    
+    RETURN NEW;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log error but don't block the follow operation
+        RAISE NOTICE 'Error creating follow notification: %', SQLERRM;
+        RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Drop the trigger if it exists already to avoid errors
+DROP TRIGGER IF EXISTS after_insert_follow ON follows;
+
+-- Create the trigger
+CREATE TRIGGER after_insert_follow
+AFTER INSERT ON follows
+FOR EACH ROW
+EXECUTE FUNCTION create_follow_notification();
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id_read ON notifications(user_id, read);

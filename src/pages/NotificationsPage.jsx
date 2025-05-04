@@ -1,13 +1,10 @@
 // src/pages/NotificationsPage.jsx
-//
-// Streamlined Notifications page without tab navigation
-// Shows all user notifications in a single, clean feed
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import notificationService from '../services/notificationService';
 import AppLayout from '../components/layout/AppLayout';
 import Card from '../components/ui/CardComponents';
 import Button from '../components/ui/FormComponents';
@@ -25,60 +22,78 @@ const NotificationItem = ({ notification, onRead }) => {
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const diffMinutes = Math.floor(diffSeconds / 60);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffSeconds < 60) return 'Just now';
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return new Date(timestamp).toLocaleDateString();
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffSeconds = Math.floor(diffMs / 1000);
+      const diffMinutes = Math.floor(diffSeconds / 60);
+      const diffHours = Math.floor(diffMinutes / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      
+      if (diffSeconds < 60) return 'Just now';
+      if (diffMinutes < 60) return `${diffMinutes}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return new Date(timestamp).toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return 'Recently';
+    }
   };
+
+  // Parse data with error handling
+  const getParsedData = () => {
+    try {
+      return typeof data === 'string' ? JSON.parse(data) : data || {};
+    } catch (error) {
+      console.error('Error parsing notification data:', error);
+      return {};
+    }
+  };
+  
+  const parsedData = getParsedData();
 
   // Get notification content based on type
   const getContent = () => {
     try {
-      // Parse data if it's a string
-      const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-      
       switch (type) {
         case 'like':
           return (
             <>
-              <span className="font-medium">{parsedData.username}</span> liked your post
+              <span className="font-medium">{parsedData.username || 'Someone'}</span> liked your post
             </>
           );
         case 'comment':
           return (
             <>
-              <span className="font-medium">{parsedData.username}</span> commented on your post:
-              <span className="text-white/70 italic ml-1 line-clamp-1">"{parsedData.content}"</span>
+              <span className="font-medium">{parsedData.username || 'Someone'}</span> commented on your post
+              {parsedData.content && (
+                <span className="text-white/70 italic ml-1 line-clamp-1">
+                  "{parsedData.content}"
+                </span>
+              )}
             </>
           );
         case 'follow':
           return (
             <>
-              <span className="font-medium">{parsedData.username}</span> started following you
+              <span className="font-medium">{parsedData.username || 'Someone'}</span> started following you
             </>
           );
         case 'mention':
           return (
             <>
-              <span className="font-medium">{parsedData.username}</span> mentioned you in a comment
+              <span className="font-medium">{parsedData.username || 'Someone'}</span> mentioned you
             </>
           );
         case 'system':
-          return <>{parsedData.message}</>;
+          return <>{parsedData.message || 'New notification'}</>;
         default:
           return <>{parsedData.message || 'New notification'}</>;
       }
     } catch (error) {
-      console.error('Error parsing notification data:', error);
+      console.error('Error generating notification content:', error);
       return 'New notification';
     }
   };
@@ -144,9 +159,6 @@ const NotificationItem = ({ notification, onRead }) => {
     }
     
     try {
-      // Parse data to get redirect info
-      const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-      
       // Navigate based on notification type
       switch (type) {
         case 'like':
@@ -158,11 +170,8 @@ const NotificationItem = ({ notification, onRead }) => {
         case 'follow':
           if (parsedData.username) {
             navigate(`/profile/${parsedData.username}`);
-          }
-          break;
-        case 'mention':
-          if (parsedData.post_id) {
-            navigate(`/post/${parsedData.post_id}`);
+          } else if (notification.actor_id) {
+            navigate(`/profile/${notification.actor_id}`);
           }
           break;
         default:
@@ -204,8 +213,6 @@ const NotificationItem = ({ notification, onRead }) => {
 
 /**
  * EmptyState Component
- * 
- * Displayed when there are no notifications
  */
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
@@ -223,8 +230,6 @@ const EmptyState = () => (
 
 /**
  * NotificationsPage Component
- * 
- * Main notifications page that shows all user notifications
  */
 const NotificationsPage = () => {
   const { user } = useAuth();
@@ -269,13 +274,12 @@ const NotificationsPage = () => {
         )
       );
       
-      // Update in database
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', notificationId);
+      // Update in database using the service
+      await notificationService.markAsRead(notificationId);
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      // Revert if there's an error
+      fetchNotifications();
     }
   };
   
@@ -289,14 +293,12 @@ const NotificationsPage = () => {
         prev.map(notification => ({ ...notification, read: true }))
       );
       
-      // Update in database
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('user_id', user.id)
-        .eq('read', false);
+      // Update in database using the service
+      await notificationService.markAllAsRead(user.id);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+      // Revert if there's an error
+      fetchNotifications();
     }
   };
   
@@ -305,8 +307,8 @@ const NotificationsPage = () => {
     fetchNotifications();
     
     // Set up real-time subscription for new notifications
-    const channel = supabase
-      .channel('notifications_channel')
+    const notificationChannel = supabase
+      .channel('notifications-channel')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -320,7 +322,7 @@ const NotificationsPage = () => {
     
     // Clean up subscription
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(notificationChannel);
     };
   }, [fetchNotifications, user?.id]);
   

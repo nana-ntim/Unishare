@@ -3,19 +3,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
+import { useFollowStatus } from '../services/followService';
 import { supabase } from '../lib/supabase';
 import AppLayout from '../components/layout/AppLayout';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/FormComponents';
+import UserFollowButton from '../components/ui/UserFollowButton';
 
 /**
  * PostDetailPage Component
  * 
- * Clean, streamlined post detail page with:
- * - Post image and caption
- * - Comments section
- * - Like, bookmark, and share functionality
- * - Responsive layout for mobile and desktop
+ * Displays a post with comments and interactions
  */
 const PostDetailPage = () => {
   const { postId } = useParams();
@@ -130,7 +128,11 @@ const PostDetailPage = () => {
             content,
             created_at,
             user_id,
-            profiles:user_id (username, avatar_url)
+            profiles:user_id (
+              id,
+              username, 
+              avatar_url
+            )
           `)
           .eq('post_id', postId)
           .order('created_at', { ascending: false });
@@ -170,7 +172,7 @@ const PostDetailPage = () => {
         const fetchCommentUser = async () => {
           const { data: userData } = await supabase
             .from('profiles')
-            .select('username, avatar_url')
+            .select('id, username, avatar_url')
             .eq('id', payload.new.user_id)
             .single();
             
@@ -196,6 +198,9 @@ const PostDetailPage = () => {
       supabase.removeChannel(commentsSubscription);
     };
   }, [postId]);
+  
+  // Get follow status for post author (if not the current user)
+  const authorFollowStatus = useFollowStatus(post?.user_id);
   
   // Handle like
   const handleLike = async () => {
@@ -687,15 +692,27 @@ const PostDetailPage = () => {
                   />
                 </Link>
                 <div className="ml-3">
-                  <Link to={`/profile/${post.username}`} className="font-medium text-white hover:text-cyan-400 transition-colors">
-                    {post.full_name || post.username}
-                  </Link>
+                  <div className="flex items-center">
+                    <Link to={`/profile/${post.username}`} className="font-medium text-white hover:text-cyan-400 transition-colors">
+                      {post.full_name || post.username}
+                    </Link>
+                    {!isOwner && user?.id !== post.user_id && (
+                      <div className="ml-2">
+                        <UserFollowButton
+                          userId={post.user_id}
+                          variant="secondary"
+                          size="small"
+                          showState={false}
+                        />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center text-white/50 text-xs">
                     {formatRelativeTime(post.created_at)}
                     {post.location && (
                       <>
                         <span className="mx-1">•</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
