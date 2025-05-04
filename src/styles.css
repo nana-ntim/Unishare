@@ -1,0 +1,339 @@
+/* src/styles.css */
+/* 
+ * Main styles for UniShare application
+ * Consolidated from App.css and index.css
+ */
+
+/* Import Tailwind directives */
+@import "tailwindcss";
+
+/* Base styles */
+@layer base {
+  html {
+    @apply bg-black text-white;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 
+      Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply m-0 p-0 min-h-screen;
+    overflow-x: hidden;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  /* Apply scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  a {
+    @apply text-cyan-400 no-underline;
+    transition: color 0.2s ease;
+  }
+
+  a:hover {
+    @apply text-cyan-300;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  button, input, textarea, select {
+    font-family: inherit;
+  }
+}
+
+/* Container utilities */
+.container-sm {
+  @apply max-w-3xl mx-auto px-4;
+}
+
+.container-md {
+  @apply max-w-4xl mx-auto px-4;
+}
+
+.container-lg {
+  @apply max-w-6xl mx-auto px-4;
+}
+
+/* Form controls styling */
+.form-input {
+  @apply w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white;
+  @apply focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50;
+  @apply transition-all duration-300;
+}
+
+.form-textarea {
+  @apply w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white;
+  @apply focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50;
+  @apply transition-all duration-300 resize-none;
+}
+
+.form-select {
+  @apply w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white;
+  @apply focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50;
+  @apply transition-all duration-300 appearance-none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff80' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1em;
+}
+
+/* Button styles */
+.btn {
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-lg;
+  @apply font-medium text-sm transition-all duration-300;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-1;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-cyan-500 to-blue-500 text-white;
+  @apply hover:shadow-lg hover:shadow-cyan-500/20;
+  @apply focus:ring-cyan-400/50;
+}
+
+.btn-secondary {
+  @apply bg-white/10 text-white;
+  @apply hover:bg-white/20;
+  @apply focus:ring-white/30;
+}
+
+.btn-danger {
+  @apply bg-gradient-to-r from-red-500 to-pink-500 text-white;
+  @apply hover:shadow-lg hover:shadow-red-500/20;
+  @apply focus:ring-red-400/50;
+}
+
+.btn-sm {
+  @apply px-3 py-1.5 text-xs rounded;
+}
+
+.btn-lg {
+  @apply px-6 py-3 text-base;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden;
+  @apply transition-colors hover:bg-white/8;
+}
+
+.card-body {
+  @apply p-5;
+}
+
+.card-header {
+  @apply px-5 py-4 border-b border-white/10;
+}
+
+.card-footer {
+  @apply px-5 py-4 border-t border-white/10;
+}
+
+/* Glass card effect */
+.glass-card {
+  @apply bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-xl;
+  @apply transition-all duration-300;
+}
+
+.glass-card:hover {
+  @apply bg-white/8 border-white/20;
+}
+
+/* Text truncation */
+.text-truncate {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
+}
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hide scrollbar while keeping functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
+/* Custom utilities */
+.text-gradient {
+  @apply bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  @apply animate-spin inline-block;
+  border-top-color: currentColor;
+  border-left-color: currentColor;
+}
+
+/* Badge styles */
+.badge {
+  @apply inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium;
+}
+
+.badge-primary {
+  @apply bg-cyan-400 text-white;
+}
+
+.badge-secondary {
+  @apply bg-white/20 text-white/80;
+}
+
+.badge-outline {
+  @apply border border-white/20 text-white/70;
+}
+
+/* Status dots */
+.status-dot {
+  @apply inline-block rounded-full h-2 w-2;
+}
+
+.status-dot-online {
+  @apply bg-green-500;
+}
+
+.status-dot-offline {
+  @apply bg-gray-400;
+}
+
+.status-dot-away {
+  @apply bg-yellow-500;
+}
+
+/* Customized autofill styles */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  -webkit-text-fill-color: white;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(0, 0, 0, 0.01) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Avatar styles */
+.avatar {
+  @apply relative inline-block rounded-full overflow-hidden;
+}
+
+.avatar-sm {
+  @apply w-8 h-8;
+}
+
+.avatar-md {
+  @apply w-12 h-12;
+}
+
+.avatar-lg {
+  @apply w-16 h-16;
+}
+
+.avatar-xl {
+  @apply w-24 h-24;
+}
+
+/* App-specific animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(34, 211, 238, 0.6);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Dark mode styling specific to UniShare */
+.unishare-dark-bg {
+  background-color: #000000;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(13, 148, 210, 0.03) 0%, transparent 33%),
+    radial-gradient(circle at 85% 30%, rgba(6, 92, 151, 0.03) 0%, transparent 33%);
+}
+
+/* Premium smooth transition between pages */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 300ms, transform 300ms;
+}

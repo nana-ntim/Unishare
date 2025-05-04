@@ -1,0 +1,216 @@
+/* src/App.css */
+/*
+ * Main App styles with Instagram-inspired aesthetics
+ * Apply consistent styling across the application
+ */
+
+/* Import custom theme */
+@import './styles/theme.css';
+
+/* Base styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* Font rendering improvements */
+* {
+  box-sizing: border-box;
+  text-rendering: optimizeLegibility;
+}
+
+/* Link styles */
+a {
+  color: #3797f0;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #58a6f5;
+}
+
+/* Button reset */
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.2);
+  outline-offset: 2px;
+}
+
+/* Card style standardization */
+.card {
+  background-color: #121212;
+  border-radius: 0.5rem;
+  border: 1px solid #262626;
+  overflow: hidden;
+}
+
+/* Input standardization */
+input, textarea, select {
+  background-color: #121212;
+  border: 1px solid #262626;
+  border-radius: 0.5rem;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: #3797f0;
+  outline: none;
+}
+
+/* Text ellipsis */
+.text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Instagram-style gradients */
+.instagram-gradient {
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+}
+
+.instagram-gradient-text {
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Loading states */
+.loading-shimmer {
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+/* Grid layouts */
+.masonry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-gap: 1px;
+  grid-auto-rows: 0;
+}
+
+/* Container utils */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(3px);
+}
+
+/* Transition utilities */
+.transition-standard {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Utils for consistent spacing */
+.section-spacing {
+  margin-bottom: 1.5rem;
+}
+
+/* Contextual backgrounds */
+.bg-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Instagram story ring */
+.story-ring {
+  position: relative;
+}
+
+.story-ring::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  border-radius: 50%;
+  z-index: -1;
+}
